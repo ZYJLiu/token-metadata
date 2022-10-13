@@ -135,29 +135,39 @@ async function main() {
 
   console.log(verify)
 
-  const originalNft2 = await metaplex
+  const update = await metaplex
     .nfts()
-    .create({
-      uri: uri,
-      name: "NFT",
-      sellerFeeBasisPoints: 0,
-      symbol: symbol,
-      collection: collectionNft.mintAddress,
+    .update({
+      nftOrSft: originalNft.nft,
+      name: "Updated Name",
     })
     .run()
 
-  console.log(originalNft2)
+  console.log(update)
 
-  const verify2 = await metaplex
-    .nfts()
-    .verifyCollection({
-      mintAddress: originalNft2.mintAddress,
-      collectionMintAddress: collectionNft.mintAddress,
-      isSizedCollection: true,
-    })
-    .run()
+  // const originalNft2 = await metaplex
+  //   .nfts()
+  //   .create({
+  //     uri: uri,
+  //     name: "NFT",
+  //     sellerFeeBasisPoints: 0,
+  //     symbol: symbol,
+  //     collection: collectionNft.mintAddress,
+  //   })
+  //   .run()
 
-  console.log(verify2)
+  // console.log(originalNft2)
+
+  // const verify2 = await metaplex
+  //   .nfts()
+  //   .verifyCollection({
+  //     mintAddress: originalNft2.mintAddress,
+  //     collectionMintAddress: collectionNft.mintAddress,
+  //     isSizedCollection: true,
+  //   })
+  //   .run()
+
+  // console.log(verify2)
   // console.log(
   //   `Transaction: https://explorer.solana.com/tx/${transactionSignature}?cluster=devnet`
   // )
