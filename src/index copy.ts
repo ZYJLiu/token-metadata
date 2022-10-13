@@ -34,8 +34,6 @@ import {
 import { awsStorage } from "@metaplex-foundation/js-plugin-aws"
 import { S3Client } from "@aws-sdk/client-s3"
 import * as fs from "fs"
-import dotenv from "dotenv"
-dotenv.config()
 
 const tokenName = "Token Name"
 const description = "Description"
@@ -67,8 +65,8 @@ async function main() {
   const awsClient = new S3Client({
     region: "us-east-1",
     credentials: {
-      accessKeyId: process.env.ACCESS_KEY_ID!,
-      secretAccessKey: process.env.SECRET_ACCESS_KEY!,
+      accessKeyId: "AKIA4NT6BEVPPTNIXHX6",
+      secretAccessKey: "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",
     },
   })
 
@@ -99,68 +97,102 @@ async function main() {
 
   console.log("metadata uri:", uri)
 
-  const collectionNft = await metaplex
-    .nfts()
-    .create({
-      uri: uri,
-      name: "Collection",
-      sellerFeeBasisPoints: 0,
-      isCollection: true,
-    })
-    .run()
+  // onchain metadata format
+  const tokenMetadata = {
+    name: tokenName,
+    symbol: symbol,
+    uri: uri,
+    sellerFeeBasisPoints: 0,
+    creators: null,
+    collection: null,
+    uses: null,
+  } as DataV2
 
-  console.log(collectionNft)
+  // transaction to create metadata account
+  const transaction = new Transaction().add(
+    // create new account
+    SystemProgram.createAccount({
+      fromPubkey: user.publicKey,
+      newAccountPubkey: mintKeypair.publicKey,
+      space: MINT_SIZE,
+      lamports: lamports,
+      programId: TOKEN_PROGRAM_ID,
+    }),
+    // create new token mint
+    createInitializeMintInstruction(
+      mintKeypair.publicKey,
+      decimals,
+      user.publicKey,
+      user.publicKey,
+      TOKEN_PROGRAM_ID
+    ),
+    // create metadata account
+    createCreateMetadataAccountV2Instruction(
+      {
+        metadata: metadataPDA,
+        mint: mintKeypair.publicKey,
+        mintAuthority: user.publicKey,
+        payer: user.publicKey,
+        updateAuthority: user.publicKey,
+      },
+      {
+        createMetadataAccountArgsV2: {
+          data: tokenMetadata,
+          isMutable: true,
+        },
+      }
+    )
+  )
 
-  const originalNft = await metaplex
-    .nfts()
-    .create({
-      uri: uri,
-      name: "NFT",
-      sellerFeeBasisPoints: 0,
-      symbol: symbol,
-      collection: collectionNft.mintAddress,
-    })
-    .run()
+  // instruction to create ATA
+  const createTokenAccountInstruction = createAssociatedTokenAccountInstruction(
+    user.publicKey, // payer
+    tokenATA, // token address
+    user.publicKey, // token owner
+    mintKeypair.publicKey // token mint
+  )
 
-  console.log(originalNft)
+  let tokenAccount: Account
+  try {
+    // check if token account already exists
+    tokenAccount = await getAccount(
+      connection, // connection
+      tokenATA // token address
+    )
+  } catch (error: unknown) {
+    if (
+      error instanceof TokenAccountNotFoundError ||
+      error instanceof TokenInvalidAccountOwnerError
+    ) {
+      try {
+        // add instruction to create token account if one does not exist
+        transaction.add(createTokenAccountInstruction)
+      } catch (error: unknown) {}
+    } else {
+      throw error
+    }
+  }
 
-  const verify = await metaplex
-    .nfts()
-    .verifyCollection({
-      mintAddress: originalNft.mintAddress,
-      collectionMintAddress: collectionNft.mintAddress,
-      isSizedCollection: true,
-    })
-    .run()
+  transaction.add(
+    // mint tokens to token account
+    createMintToInstruction(
+      mintKeypair.publicKey,
+      tokenATA,
+      user.publicKey,
+      amount * Math.pow(10, decimals)
+    )
+  )
 
-  console.log(verify)
+  // send transaction
+  const transactionSignature = await sendAndConfirmTransaction(
+    connection,
+    transaction,
+    [user, mintKeypair]
+  )
 
-  const originalNft2 = await metaplex
-    .nfts()
-    .create({
-      uri: uri,
-      name: "NFT",
-      sellerFeeBasisPoints: 0,
-      symbol: symbol,
-      collection: collectionNft.mintAddress,
-    })
-    .run()
-
-  console.log(originalNft2)
-
-  const verify2 = await metaplex
-    .nfts()
-    .verifyCollection({
-      mintAddress: originalNft2.mintAddress,
-      collectionMintAddress: collectionNft.mintAddress,
-      isSizedCollection: true,
-    })
-    .run()
-
-  console.log(verify2)
-  // console.log(
-  //   `Transaction: https://explorer.solana.com/tx/${transactionSignature}?cluster=devnet`
-  // )
+  console.log(
+    `Transaction: https://explorer.solana.com/tx/${transactionSignature}?cluster=devnet`
+  )
 }
 
 main()

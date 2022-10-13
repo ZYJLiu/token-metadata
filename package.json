@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@metaplex-foundation/js": "^0.15.0",
+    "@metaplex-foundation/js-plugin-aws": "^0.1.3",
     "@solana/spl-token": "^0.2.0",
     "@solana/web3.js": "^1.53.0",
     "dotenv": "^16.0.0"
